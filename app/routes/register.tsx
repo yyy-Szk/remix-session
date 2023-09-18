@@ -1,12 +1,29 @@
-import { ActionFunctionArgs, json, redirect } from "@remix-run/node";
+import { LoaderFunctionArgs, ActionFunctionArgs, json, redirect } from "@remix-run/node";
 import { Form, Link, useActionData } from "@remix-run/react";
 import { createUser, getUserByUsername } from "~/models/user.server";
+import { getSession, commitSession } from "~/sessions";
 
-export const loader = async () => {
-  // ここに、ログインしていたらユーザーページにリダイレクトする処理を書きたい
+export const loader = async ({request}: LoaderFunctionArgs) => {
+  const session = await getSession(request.headers.get("Cookie"));
+  if (session.has("userId")) {
+    session.flash("message", "ログイン済みです")
+    return redirect("/users", { headers: { "Set-Cookie": await commitSession(session) }})
+  }
+
+  return json(
+    {
+      message: session.get("message")
+    },
+    {
+      status: 200,
+      headers: { "Set-Cookie": await commitSession(session) }
+    }
+  )
 }
 
 export const action = async ({request}: ActionFunctionArgs) => {
+  const session = await getSession(request.headers.get("Cookie"));
+
   const body = await request.formData();
   const username = body.get("username");
   const password = body.get("password");
@@ -19,7 +36,6 @@ export const action = async ({request}: ActionFunctionArgs) => {
   }
 
   const user = await getUserByUsername(username);
-
   if (user) {
     return json(
       { errors: { message: "Username already exists." } },
@@ -28,9 +44,10 @@ export const action = async ({request}: ActionFunctionArgs) => {
   }
 
   const newUser = await createUser(username, password);
-  // ここにログイン処理を書きたい
+  session.set("userId", String(newUser.id));
+  session.flash("message", "ログインしました。")
 
-  return redirect("/users")
+  return redirect("/users", { headers: { "Set-Cookie": await commitSession(session) }})
 }
 
 export default function Register() {

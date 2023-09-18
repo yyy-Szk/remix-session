@@ -12,10 +12,11 @@ export async function getUserByUsername(username: string) {
 
 export async function authenticateUser(username: string, password: string) {
   const user = await getUserByUsername(username);
-  if (!user) {
-    return false;
+  if (!user || user.password !== password) {
+    return null;
   }
-  return user.password === password;
+
+  return user.id
 }
 
 export async function createUser(username: string, password: string) {
